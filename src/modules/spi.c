@@ -7,9 +7,9 @@
 
 #include "spi.h"
 
-#include "../st/ll/stm32l4xx_ll_bus.h"
-#include "../st/ll/stm32l4xx_ll_gpio.h"
-#include "../st/ll/stm32l4xx_ll_spi.h"
+#include "../st/ll/stm32f4xx_ll_bus.h"
+#include "../st/ll/stm32f4xx_ll_gpio.h"
+#include "../st/ll/stm32f4xx_ll_spi.h"
 
 #include "sys_time.h"
 
@@ -24,8 +24,8 @@
 #define MISO_PIN  LL_GPIO_PIN_6
 #define MISO_AF   LL_GPIO_AF_5
 
-#define SCK_PORT GPIOA
-#define SCK_PIN  LL_GPIO_PIN_1
+#define SCK_PORT GPIOB
+#define SCK_PIN  LL_GPIO_PIN_3
 #define SCK_AF   LL_GPIO_AF_5
 
 // public function definitions
@@ -33,8 +33,10 @@ void spi_init(void)
 {
     // enable peripheral clocks
     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SPI1);
-    if (!LL_AHB2_GRP1_IsEnabledClock(LL_AHB2_GRP1_PERIPH_GPIOA))
-        LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
+    if (!LL_AHB1_GRP1_IsEnabledClock(LL_AHB1_GRP1_PERIPH_GPIOA))
+        LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
+    if (!LL_AHB1_GRP1_IsEnabledClock(LL_AHB1_GRP1_PERIPH_GPIOB))
+        LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOB);
 
     // configure pins
     LL_GPIO_SetPinMode(MOSI_PORT, MOSI_PIN, LL_GPIO_MODE_ALTERNATE);
@@ -53,14 +55,14 @@ void spi_init(void)
     LL_GPIO_SetPinPull(SCK_PORT, SCK_PIN, LL_GPIO_PULL_DOWN);
 
     // configure SPI module
-    LL_SPI_SetBaudRatePrescaler(SPI_INSTANCE, LL_SPI_BAUDRATEPRESCALER_DIV2);
+    LL_SPI_SetBaudRatePrescaler(SPI_INSTANCE, LL_SPI_BAUDRATEPRESCALER_DIV4);
     LL_SPI_SetTransferDirection(SPI_INSTANCE, LL_SPI_FULL_DUPLEX);
     LL_SPI_SetClockPolarity(SPI_INSTANCE, LL_SPI_POLARITY_LOW);
     LL_SPI_SetClockPhase(SPI_INSTANCE, LL_SPI_PHASE_1EDGE);
 
     LL_SPI_SetDataWidth(SPI_INSTANCE, LL_SPI_DATAWIDTH_8BIT);
     LL_SPI_SetNSSMode(SPI_INSTANCE, LL_SPI_NSS_SOFT);
-    LL_SPI_SetRxFIFOThreshold(SPI_INSTANCE, LL_SPI_RX_FIFO_TH_QUARTER);
+    // LL_SPI_SetRxFIFOThreshold(SPI_INSTANCE, LL_SPI_RX_FIFO_TH_QUARTER);
 
     LL_SPI_SetMode(SPI_INSTANCE, LL_SPI_MODE_MASTER);
     LL_SPI_Enable(SPI_INSTANCE);

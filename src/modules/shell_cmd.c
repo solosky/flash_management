@@ -11,6 +11,7 @@
 #include <string.h>
 
 #include "../fatfs/ff.h"
+#include "../dhara/map.h"
 #include "mem.h"
 #include "shell.h"
 #include "spi_nand.h"
@@ -43,6 +44,10 @@ static void command_write_file(int argc, char *argv[]);
 static void command_read_file(int argc, char *argv[]);
 static void command_list_dir(int argc, char *argv[]);
 static void command_file_size(int argc, char *argv[]);
+static void command_drive_stat(int argc, char *argv[]);
+static void command_mkfs(int argc, char *argv[]);
+static void command_mount(int argc, char *argv[]);
+static void command_sync(int argc, char *argv[]);
 
 static const shell_command_t *find_command(const char *name);
 static void print_bytes(uint8_t *data, size_t len);
@@ -74,6 +79,11 @@ static const shell_command_t shell_commands[] = {
     {"list_dir", command_list_dir, "Lists files and subdirectories within a given directory.",
      "list_dir <path>"},
     {"file_size", command_file_size, "Prints the size of the given file.", "file_size <filename>"},
+    {"drive_stat", command_drive_stat, "Prints drive stat", "drive_stat"},
+    {"mkfs", command_mkfs, "Prints mkfs", "mkfs"},
+    {"mount", command_mount, "Prints mount", "mount"},
+     {"sync", command_sync, "Prints sync", "sync"},
+
 };
 
 // public function definitions
@@ -141,12 +151,12 @@ static void command_read_page(int argc, char *argv[])
     }
     // attempt to read..
     row_address_t row = {.block = block, .page = page};
-    int ret = spi_nand_page_read(row, column, page_buffer, sizeof(page_buffer));
+    int ret = spi_nand_page_read(row, column, page_buffer, SPI_NAND_PAGE_SIZE);
     if (SPI_NAND_RET_OK != ret) {
         shell_printf_line("Error when attempting to read page: %d.", ret);
     }
     else {
-        print_bytes(page_buffer, sizeof(page_buffer) - column);
+        print_bytes(page_buffer, SPI_NAND_PAGE_SIZE - column);
     }
 
     mem_free(page_buffer);
@@ -175,7 +185,7 @@ static void command_write_page(int argc, char *argv[])
         return;
     }
     // create write data
-    size_t write_len = sizeof(page_buffer) - column;
+    size_t write_len = SPI_NAND_PAGE_SIZE - column;
     memset(page_buffer, value, write_len);
     // attempt to write..
     row_address_t row = {.block = block, .page = page};
@@ -514,5 +524,63 @@ static void print_bytes(uint8_t *data, size_t len)
         else {
             shell_printf("%02x ", data[i]); // print with trailing space
         }
+    }
+}
+
+static void command_drive_stat(int argc, char *argv[])
+{
+    FATFS *fs;
+    DWORD fre_clust, fre_sect, tot_sect;
+
+    /* Get volume information and free clusters of drive 1 */
+    FRESULT res = f_getfree("", &fre_clust, &fs);
+    if (res) {
+        shell_printf_line("get free call failed: %d", res);
+        return;
+    }
+
+    /* Get total sectors and free sectors */
+    tot_sect = (fs->n_fatent - 2) * fs->csize;
+    fre_sect = fre_clust * fs->csize;
+
+    /* Print the free space (assuming 512 bytes/sector) */
+    shell_printf_line("%10lu KiB total drive space.\n%10lu KiB available.\n", tot_sect / 2,
+                      fre_sect / 2);
+}
+
+static void command_mkfs(int argc, char *argv[])
+{
+    extern uint8_t *work_buffer;
+    FRESULT res = f_mkfs("", 0, work_buffer, FF_MAX_SS);
+    if (FR_OK != res) {
+        shell_printf_line("f_mkfs failed, result: %d.", res); // fs make failure
+    }
+    else {
+        shell_prints_line("f_mkfs succeeded!"); // fs make success
+    }
+}
+
+static void command_mount(int argc, char *argv[])
+{
+    extern uint8_t *work_buffer;
+    extern FATFS fs;
+    FRESULT res = f_mount(&fs, "", 1);
+    if (FR_OK == res) {
+        shell_prints_line("f_mount succeeded!");
+    }
+    else {
+        shell_printf_line("f_mount failed, result: %d.", res);
+    }
+}
+
+static void command_sync(int argc, char *argv[])
+{
+    dhara_error_t err;
+    extern struct dhara_map map;
+    int ret = dhara_map_sync(&map, &err);
+    if (ret) {
+        shell_printf_line("dhara sync failed: %d, error: %d", ret, err);
+    }else{
+        shell_printf_line("dhara sync success");
     }
 }

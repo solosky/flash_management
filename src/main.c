@@ -7,10 +7,10 @@
 
 #include <stdint.h>
 
-#include "st/ll/stm32l4xx_ll_bus.h"
-#include "st/ll/stm32l4xx_ll_rcc.h"
-#include "st/ll/stm32l4xx_ll_system.h"
-#include "st/ll/stm32l4xx_ll_utils.h"
+#include "st/ll/stm32f4xx_ll_bus.h"
+#include "st/ll/stm32f4xx_ll_rcc.h"
+#include "st/ll/stm32f4xx_ll_system.h"
+#include "st/ll/stm32f4xx_ll_utils.h"
 #include "st/stm32_assert.h"
 
 #include "modules/led.h"
@@ -23,6 +23,8 @@
 #include "fatfs/ff.h"
 #include "fatfs/ffconf.h"
 
+#include "rtt/SEGGER_RTT.h"
+
 // defines
 #define STARTUP_LED_DURATION_MS 200
 
@@ -31,10 +33,13 @@ static void clock_config(void);
 
 // private variables
 FATFS fs; // file system object
+uint8_t *work_buffer;
 
 // application main function
 int main(void)
 {
+
+    SEGGER_RTT_Init();
     // setup clock
     clock_config();
 
@@ -46,9 +51,9 @@ int main(void)
     spi_init();
 
     // blink LED to let user know we're on
-    led_set_output(true);
-    sys_time_delay(STARTUP_LED_DURATION_MS);
     led_set_output(false);
+    sys_time_delay(STARTUP_LED_DURATION_MS);
+    led_set_output(true);
 
     // mount file system
     FRESULT res = f_mount(&fs, "", 1);
@@ -62,7 +67,7 @@ int main(void)
     // if filesystem mount failed due to no filesystem, attempt to make it
     if (FR_NO_FILESYSTEM == res) {
         shell_prints_line("No filesystem present. Attempting to make file system..");
-        uint8_t *work_buffer = mem_alloc(FF_MAX_SS);
+        work_buffer = mem_alloc(FF_MAX_SS);
         if (!work_buffer) {
             shell_prints_line("Unable to allocate f_mkfs work buffer. File system not created.");
         }
@@ -101,14 +106,14 @@ static void clock_config(void)
                                // latency
     LL_FLASH_SetLatency(LL_FLASH_LATENCY_4);
     // enable MSI
-    LL_RCC_MSI_Enable();
-    while (LL_RCC_MSI_IsReady() != 1)
-        ; // TODO: add timeouts to these while loops
+    //LL_RCC_MSI_Enable();
+    //while (LL_RCC_MSI_IsReady() != 1)
+    //    ; // TODO: add timeouts to these while loops
 
     // pll config & enable
-    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_MSI, LL_RCC_PLLM_DIV_1, 40, LL_RCC_PLLR_DIV_2);
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_2, 40, LL_RCC_PLLP_DIV_2);
     LL_RCC_PLL_Enable();
-    LL_RCC_PLL_EnableDomain_SYS();
+    //LL_RCC_PLL_EnableDomain_SYS();
     while (LL_RCC_PLL_IsReady() != 1)
         ;
 
@@ -123,7 +128,7 @@ static void clock_config(void)
     LL_RCC_SetAPB2Prescaler(LL_RCC_APB2_DIV_1);
 
     // configure peripheral clock sources
-    LL_RCC_SetUSARTClockSource(LL_RCC_USART2_CLKSOURCE_PCLK1);
+    //LL_RCC_SetUSARTClockSource(LL_RCC_USART2_CLKSOURCE_PCLK1);
 
     // update CMSIS variable
     LL_SetSystemCoreClock(80000000UL);

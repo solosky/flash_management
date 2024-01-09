@@ -14,7 +14,7 @@
 
 // private variables
 static bool initialized = false;
-static struct dhara_map map;
+struct dhara_map map;
 static uint8_t page_buffer[SPI_NAND_PAGE_SIZE];
 static struct dhara_nand nand = {
     .log2_page_size = SPI_NAND_LOG2_PAGE_SIZE,

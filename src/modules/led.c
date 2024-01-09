@@ -7,14 +7,14 @@
 
 #include "led.h"
 
-#include "../st/ll/stm32l4xx_ll_bus.h"
+#include "../st/ll/stm32f4xx_ll_bus.h"
 
 // public function definitions
 void led_init(void)
 {
     // enable peripheral clock
-    if (!LL_AHB2_GRP1_IsEnabledClock(LL_AHB2_GRP1_PERIPH_GPIOB))
-        LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOB);
+    if (!LL_AHB1_GRP1_IsEnabledClock(LL_AHB1_GRP1_PERIPH_GPIOA))
+        LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
 
     // setup pin as output -- default to low (LED off)
     led_set_output(false);

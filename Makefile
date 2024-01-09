@@ -11,12 +11,12 @@ PROJECT := flash_management
 BUILD_DIR ?= build
 
 SRCS += \
-	src/st/ll/stm32l4xx_ll_gpio.c \
-	src/st/ll/stm32l4xx_ll_pwr.c \
-	src/st/ll/stm32l4xx_ll_rcc.c \
-	src/st/ll/stm32l4xx_ll_spi.c \
-	src/st/ll/stm32l4xx_ll_utils.c \
-	src/st/system_stm32l4xx.c \
+	src/st/ll/stm32f4xx_ll_gpio.c \
+	src/st/ll/stm32f4xx_ll_pwr.c \
+	src/st/ll/stm32f4xx_ll_rcc.c \
+	src/st/ll/stm32f4xx_ll_spi.c \
+	src/st/ll/stm32f4xx_ll_utils.c \
+	src/st/system_stm32f4xx.c \
 	src/dhara/error.c \
 	src/dhara/journal.c \
 	src/dhara/map.c \
@@ -34,15 +34,18 @@ SRCS += \
 	src/modules/spi_nand.c \
 	src/modules/sys_time.c \
 	src/modules/uart.c \
+	src/rtt/SEGGER_RTT.c \
+	src/rtt/SEGGER_RTT_printf.c \
 	src/syscalls.c \
-	src/startup_stm32l432kc.c \
-	src/stm32l432kc_it.c \
+	src/st/startup_stm32f405rgtx.s \
+	src/st/stm32f4xx_it.c \
 	src/main.c
 
 INCLUDES += \
 	src/st \
 	src/st/ll \
 	src/cmsis \
+	src/rtt \
 
 
 CC=arm-none-eabi-gcc
@@ -79,7 +82,7 @@ CFLAGS += \
 	-mthumb
 
 LDFLAGS += \
-	-T src/stm32l432kc.ld \
+	-T src/st/stm32f405rg.ld \
 	-static \
 	-lc \
 	-lm \
@@ -92,7 +95,7 @@ LDFLAGS += \
 DEFINES += \
 	DEBUG \
 	USE_FULL_ASSERT \
-	STM32L432xx
+	STM32F405xx
 
 CFLAGS += $(foreach i,$(INCLUDES),-I$(i))
 CFLAGS += $(foreach d,$(DEFINES),-D$(d))
@@ -136,4 +139,8 @@ clean:
 
 .PHONY: flash
 flash: $(BUILD_DIR)/$(PROJECT).bin
-	$(STFLASH) write $(BUILD_DIR)/$(PROJECT).bin 0x08000000
+#	$(STFLASH) write $(BUILD_DIR)/$(PROJECT).bin 0x08000000
+	pyocd flash -t stm32f405rg $(BUILD_DIR)/$(PROJECT).bin
+
+rtt:
+	pyocd rtt -t stm32f405rg

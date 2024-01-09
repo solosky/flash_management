@@ -10,22 +10,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-#include "../st/ll/stm32l4xx_ll_bus.h"
-#include "../st/ll/stm32l4xx_ll_gpio.h"
-#include "../st/ll/stm32l4xx_ll_rcc.h"
-#include "../st/ll/stm32l4xx_ll_usart.h"
-#include "../st/stm32l4xx.h"
+#include "../st/ll/stm32f4xx_ll_bus.h"
+#include "../st/ll/stm32f4xx_ll_gpio.h"
+#include "../st/ll/stm32f4xx_ll_rcc.h"
+#include "../st/ll/stm32f4xx_ll_usart.h"
+#include "../st/stm32f4xx.h"
 
 #include "fifo.h"
 #include "sys_time.h"
 
 // defines
-#define VCP_TX_PORT GPIOA
-#define VCP_TX_PIN  LL_GPIO_PIN_2
-#define VCP_RX_PORT GPIOA
-#define VCP_RX_PIN  LL_GPIO_PIN_15
+#define VCP_TX_PORT GPIOC
+#define VCP_TX_PIN  LL_GPIO_PIN_6
+#define VCP_RX_PORT GPIOC
+#define VCP_RX_PIN  LL_GPIO_PIN_7
 
-#define VCP_UART USART2
+#define VCP_UART USART6
 
 #define BAUD_RATE    115200
 #define PUTC_TIMEOUT 10 // ms
@@ -46,22 +46,22 @@ static fifo_t rx_fifo = FIFO_STATIC_INIT(rx_fifo_memblock, sizeof(rx_fifo_memblo
 void uart_init(void)
 {
     // enable peripheral clocks
-    LL_APB1_GRP1_EnableClock(LL_APB1_GRP1_PERIPH_USART2);
-    if (!LL_AHB2_GRP1_IsEnabledClock(LL_AHB2_GRP1_PERIPH_GPIOA))
-        LL_AHB2_GRP1_EnableClock(LL_AHB2_GRP1_PERIPH_GPIOA);
+     LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_USART6);
+   if (!LL_AHB1_GRP1_IsEnabledClock(LL_AHB1_GRP1_PERIPH_GPIOC))
+        LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOC);
 
     // setup pins
     LL_GPIO_SetPinMode(VCP_TX_PORT, VCP_TX_PIN, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetPinOutputType(VCP_TX_PORT, VCP_TX_PIN, LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinSpeed(VCP_TX_PORT, VCP_TX_PIN, LL_GPIO_SPEED_FREQ_VERY_HIGH);
     LL_GPIO_SetPinPull(VCP_TX_PORT, VCP_TX_PIN, LL_GPIO_PULL_NO);
-    LL_GPIO_SetAFPin_0_7(VCP_TX_PORT, VCP_TX_PIN, LL_GPIO_AF_7);
+    LL_GPIO_SetAFPin_8_15(VCP_TX_PORT, VCP_TX_PIN, LL_GPIO_AF_8);
 
     LL_GPIO_SetPinMode(VCP_RX_PORT, VCP_RX_PIN, LL_GPIO_MODE_ALTERNATE);
     LL_GPIO_SetPinOutputType(VCP_RX_PORT, VCP_RX_PIN, LL_GPIO_OUTPUT_PUSHPULL);
     LL_GPIO_SetPinSpeed(VCP_RX_PORT, VCP_RX_PIN, LL_GPIO_SPEED_FREQ_VERY_HIGH);
     LL_GPIO_SetPinPull(VCP_RX_PORT, VCP_RX_PIN, LL_GPIO_PULL_NO);
-    LL_GPIO_SetAFPin_8_15(VCP_RX_PORT, VCP_RX_PIN, LL_GPIO_AF_3);
+    LL_GPIO_SetAFPin_8_15(VCP_RX_PORT, VCP_RX_PIN, LL_GPIO_AF_8);
 
     // configure UART CR1
     LL_USART_SetDataWidth(VCP_UART, LL_USART_DATAWIDTH_8B);
@@ -82,9 +82,9 @@ void uart_init(void)
 
     // enable UART interrupt for rx
     LL_USART_EnableIT_RXNE(VCP_UART);
-    NVIC_SetPriority(USART2_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),
+    NVIC_SetPriority(USART6_IRQn, NVIC_EncodePriority(NVIC_GetPriorityGrouping(),
                                                       UART_PREEMPT_PRIORITY, UART_SUB_PRIORITY));
-    NVIC_EnableIRQ(USART2_IRQn);
+    NVIC_EnableIRQ(USART6_IRQn);
 
     // enable UART
     LL_USART_Enable(VCP_UART);
@@ -120,20 +120,20 @@ void _uart_isr(void)
 static uint32_t get_pclk1_hz(void)
 {
     uint32_t pclk1 = SystemCoreClock;
-    switch (LL_RCC_GetAPB1Prescaler()) {
-        case LL_RCC_APB1_DIV_1:
+    switch (LL_RCC_GetAPB2Prescaler()) {
+        case LL_RCC_APB2_DIV_1:
             // do nothing
             break;
-        case LL_RCC_APB1_DIV_2:
+        case LL_RCC_APB2_DIV_2:
             pclk1 /= 2;
             break;
-        case LL_RCC_APB1_DIV_4:
+        case LL_RCC_APB2_DIV_4:
             pclk1 /= 4;
             break;
-        case LL_RCC_APB1_DIV_8:
+        case LL_RCC_APB2_DIV_8:
             pclk1 /= 8;
             break;
-        case LL_RCC_APB1_DIV_16:
+        case LL_RCC_APB2_DIV_16:
             pclk1 /= 16;
             break;
         default:

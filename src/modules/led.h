@@ -12,10 +12,10 @@
 
 #include <stdbool.h>
 
-#include "../st/ll/stm32l4xx_ll_gpio.h"
+#include "../st/ll/stm32f4xx_ll_gpio.h"
 
-#define LD3_PORT GPIOB
-#define LD3_PIN  LL_GPIO_PIN_3
+#define LD3_PORT GPIOA
+#define LD3_PIN  LL_GPIO_PIN_9
 
 /// @brief Enables GPIOB clock and sets up LED pin
 void led_init(void);

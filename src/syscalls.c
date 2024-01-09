@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "modules/uart.h"
+#include "rtt/SEGGER_RTT.h"
 
 void *_sbrk(int incr)
 {
@@ -22,9 +23,15 @@ void *_sbrk(int incr)
     return prev_heap_end;
 }
 
-int _open(char *path, int flags, ...) { return -1; }
+int _open(char *path, int flags, ...)
+{
+    return -1;
+}
 
-int _close(int file) { return -1; }
+int _close(int file)
+{
+    return -1;
+}
 
 int _fstat(int file, struct stat *st)
 {
@@ -32,11 +39,20 @@ int _fstat(int file, struct stat *st)
     return 0;
 }
 
-int _isatty(int file) { return 1; }
+int _isatty(int file)
+{
+    return 1;
+}
 
-int _lseek(int file, int ptr, int dir) { return 0; }
+int _lseek(int file, int ptr, int dir)
+{
+    return 0;
+}
 
-void _kill(int pid, int sig) { return; }
+void _kill(int pid, int sig)
+{
+    return;
+}
 
 void _exit(int status)
 {
@@ -45,18 +61,22 @@ void _exit(int status)
     }
 }
 
-int _getpid(void) { return -1; }
+int _getpid(void)
+{
+    return -1;
+}
 
 int _read(int file, char *ptr, int len)
 {
     if (STDIN_FILENO == file) {
-        int i; // this needs to persist after the for loop
-        for (i = 0; i < len; i++) {
-            if (!_uart_try_getc(&ptr[i])) {
-                break;
-            }
-        }
-        return i;
+        // int i; // this needs to persist after the for loop
+        // for (i = 0; i < len; i++) {
+        //     if (!_uart_try_getc(&ptr[i])) {
+        //         break;
+        //     }
+        // }
+        // return i;
+        return SEGGER_RTT_Read(0, ptr, len);
     }
     else {
         // anything other than STDIN is invalid
@@ -69,7 +89,8 @@ int _write(int file, char *ptr, int len)
 {
     if ((STDOUT_FILENO == file) || (STDERR_FILENO == file)) {
         for (int i = 0; i < len; i++) {
-            _uart_putc(ptr[i]);
+            SEGGER_RTT_PutChar(0, ptr[i]);
+            //_uart_putc(ptr[i]);
         }
         return len;
     }

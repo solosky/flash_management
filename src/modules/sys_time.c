@@ -7,9 +7,9 @@
 
 #include "sys_time.h"
 
-#include "../st/ll/stm32l4xx_ll_utils.h"
-#include "../st/stm32l4xx.h"
-#include "../st/system_stm32l4xx.h"
+#include "../st/ll/stm32f4xx_ll_utils.h"
+#include "../st/stm32f4xx.h"
+#include "../st/system_stm32f4xx.h"
 
 // defines
 #define SYSTICK_PREEMPT_PRIORITY 0
@@ -61,4 +61,8 @@ void sys_time_delay(uint32_t duration_ms)
     uint32_t start = sys_time_ms;
     while (!sys_time_is_elapsed(start, duration_ms))
         ;
+}
+
+int get_fattime(){
+    return sys_time_get_ms() / 1000;
 }
