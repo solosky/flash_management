@@ -111,7 +111,7 @@ static void clock_config(void)
     //    ; // TODO: add timeouts to these while loops
 
     // pll config & enable
-    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_2, 40, LL_RCC_PLLP_DIV_2);
+    LL_RCC_PLL_ConfigDomain_SYS(LL_RCC_PLLSOURCE_HSI, LL_RCC_PLLM_DIV_8, 80, LL_RCC_PLLP_DIV_2);
     LL_RCC_PLL_Enable();
     //LL_RCC_PLL_EnableDomain_SYS();
     while (LL_RCC_PLL_IsReady() != 1)

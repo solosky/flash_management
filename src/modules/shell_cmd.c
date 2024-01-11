@@ -10,8 +10,8 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../fatfs/ff.h"
 #include "../dhara/map.h"
+#include "../fatfs/ff.h"
 #include "mem.h"
 #include "shell.h"
 #include "spi_nand.h"
@@ -48,6 +48,8 @@ static void command_drive_stat(int argc, char *argv[]);
 static void command_mkfs(int argc, char *argv[]);
 static void command_mount(int argc, char *argv[]);
 static void command_sync(int argc, char *argv[]);
+static void command_nand_write_test(int argc, char *argv[]);
+static void command_map_write_test(int argc, char *argv[]);
 
 static const shell_command_t *find_command(const char *name);
 static void print_bytes(uint8_t *data, size_t len);
@@ -82,7 +84,13 @@ static const shell_command_t shell_commands[] = {
     {"drive_stat", command_drive_stat, "Prints drive stat", "drive_stat"},
     {"mkfs", command_mkfs, "Prints mkfs", "mkfs"},
     {"mount", command_mount, "Prints mount", "mount"},
-     {"sync", command_sync, "Prints sync", "sync"},
+    {"sync", command_sync, "Prints sync", "sync"},
+    {"nand_write_test", command_nand_write_test,
+     "Writes a value (repeated) to a page of the SPI NAND memory unit.",
+     "nand_write_test <block> <page> <column> <value>"},
+    {"map_write_test", command_map_write_test,
+     "Writes a value (repeated) to a page of the SPI NAND memory unit.",
+     "nand_write_test <block> <page> <column> <value>"},
 
 };
 
@@ -580,7 +588,117 @@ static void command_sync(int argc, char *argv[])
     int ret = dhara_map_sync(&map, &err);
     if (ret) {
         shell_printf_line("dhara sync failed: %d, error: %d", ret, err);
-    }else{
+    }
+    else {
         shell_printf_line("dhara sync success");
     }
+}
+
+static void command_nand_write_test(int argc, char *argv[])
+{
+    if (argc != 5) {
+        shell_printf_line(
+            "write_page requires block, page, column, and value arguments. Type \"help\" "
+            "for more info.");
+        return;
+    }
+
+    // parse arguments
+    uint16_t block, page, column, value;
+    sscanf(argv[1], "%hu", &block);
+    sscanf(argv[2], "%hu", &page);
+    sscanf(argv[3], "%hu", &column);
+    sscanf(argv[4], "%hu", &value);
+
+    // attempt to allocate a page buffer
+    uint8_t *page_buffer = mem_alloc(SPI_NAND_PAGE_SIZE);
+    if (!page_buffer) {
+        shell_printf_line("Unable to allocate nand page buffer.");
+        return;
+    }
+    // create write data
+    size_t write_len = SPI_NAND_PAGE_SIZE - column;
+    memset(page_buffer, value, write_len);
+    // attempt to write..
+    row_address_t row = {.block = block, .page = page};
+    int ret = spi_nand_page_program(row, column, page_buffer, write_len);
+    if (SPI_NAND_RET_OK != ret) {
+        shell_printf_line("Error when attempting to write page: %d.", ret);
+    }
+    else {
+        shell_printf_line("Write page successful.");
+    }
+
+    uint8_t *page_buffer2 = malloc(SPI_NAND_PAGE_SIZE);
+    if (!page_buffer2) {
+        shell_printf_line("Unable to allocate nand page buffer.");
+        mem_free(page_buffer);
+        return;
+    }
+
+    ret = spi_nand_page_read(row, column, page_buffer2, write_len);
+    if (SPI_NAND_RET_OK != ret) {
+        shell_printf_line("Error when attempting to write page: %d.", ret);
+    }
+
+    if (memcmp(page_buffer, page_buffer2, write_len) != 0) {
+        shell_printf_line("read back NOT equals@@");
+    }
+
+    free(page_buffer2);
+    mem_free(page_buffer);
+}
+
+static void command_map_write_test(int argc, char *argv[])
+{
+    if (argc != 3) {
+        shell_printf_line(
+            "write_page requires block, page, column, and value arguments. Type \"help\" "
+            "for more info.");
+        return;
+    }
+
+    // parse arguments
+    uint16_t page, value;
+    sscanf(argv[1], "%hu", &page);
+    sscanf(argv[2], "%hu", &value);
+
+     extern struct dhara_map map;
+
+    // attempt to allocate a page buffer
+    uint8_t *page_buffer = mem_alloc(SPI_NAND_PAGE_SIZE);
+    if (!page_buffer) {
+        shell_printf_line("Unable to allocate nand page buffer.");
+        return;
+    }
+    // create write data
+    size_t write_len = SPI_NAND_PAGE_SIZE;
+    memset(page_buffer, value, write_len);
+
+    dhara_error_t err = DHARA_E_NONE;
+    int ret = dhara_map_write(&map, page, page_buffer, &err);
+    if (ret) {
+        shell_printf_line("Error when attempting to write sector: %d. err: %d", ret, err);
+    }
+    else {
+        shell_printf_line("Write page successful.");
+    }
+
+    uint8_t *page_buffer2 = malloc(SPI_NAND_PAGE_SIZE);
+    if (!page_buffer2) {
+        shell_printf_line("Unable to allocate nand page buffer.");
+        mem_free(page_buffer);
+        return;
+    }
+
+    ret = dhara_map_read(&map, page, page_buffer2, &err);
+    if (SPI_NAND_RET_OK != ret) {
+        shell_printf_line("Error when attempting to write page: %d.", ret);
+    }
+
+    if (memcmp(page_buffer, page_buffer2, write_len) != 0) {
+        shell_printf_line("read back NOT equals@@");
+    }
+    free(page_buffer2);
+    mem_free(page_buffer);
 }

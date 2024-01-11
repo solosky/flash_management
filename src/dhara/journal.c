@@ -368,7 +368,9 @@ static int find_root(struct dhara_journal *j, dhara_page_t start,
 static int find_head(struct dhara_journal *j, dhara_page_t start,
 		     dhara_error_t *err)
 {
-	j->head = start;
+	j->head = next_upage(j, start);
+	if (!j->head)
+		roll_stats(j);
 
 	/* Starting from the last good checkpoint, find either:
 	 *
@@ -378,11 +380,30 @@ static int find_head(struct dhara_journal *j, dhara_page_t start,
 	 * The block we end up on might be bad, but that's ok -- we'll
 	 * skip it when we go to prepare the next write.
 	 */
-	do {
-		/* Skip to the next userpage */
-		j->head = next_upage(j, j->head);
-		if (!j->head)
+	for (;;) {
+		/* How many free pages trail this checkpoint group? */
+		const unsigned int ppc = 1 << j->log2_ppc;
+		unsigned int n = 0;
+		dhara_page_t first = j->head & ~(dhara_page_t)(ppc - 1);
+
+		while (n < ppc &&
+			dhara_nand_is_free(j->nand, first + ppc - n - 1))
+			n++;
+
+		/* If we have some, then we've found our next free
+		 * userpage.
+		 */
+		if (n > 1) {
+			j->head = first + ppc - n;
+			break;
+		}
+
+		/* Skip to the next checkpoint group */
+		j->head = first + ppc;
+		if (j->head >= (j->nand->num_blocks << j->nand->log2_ppb)) {
+			j->head = 0;
 			roll_stats(j);
+		}
 
 		/* If we hit the end of the block, we're done */
 		if (is_aligned(j->head, j->nand->log2_ppb)) {
@@ -393,7 +414,7 @@ static int find_head(struct dhara_journal *j, dhara_page_t start,
 						j->nand->log2_ppb;
 			break;
 		}
-	} while (!cp_free(j, j->head));
+	}
 
 	return 0;
 }
@@ -537,6 +558,11 @@ dhara_page_t dhara_journal_peek(struct dhara_journal *j)
 	return j->tail;
 }
 
+static dhara_page_t wrap(dhara_page_t a, dhara_page_t b)
+{
+	return a >= b ? (a - b) : a;
+}
+
 void dhara_journal_dequeue(struct dhara_journal *j)
 {
 	if (j->head == j->tail)
@@ -550,7 +576,13 @@ void dhara_journal_dequeue(struct dhara_journal *j)
 	if (!(j->flags & (DHARA_JOURNAL_F_DIRTY | DHARA_JOURNAL_F_RECOVERY)))
 		j->tail_sync = j->tail;
 
-	if (j->head == j->tail)
+	const dhara_page_t chip_size = j->nand->num_blocks << j->nand->log2_ppb;
+	const dhara_page_t raw_size = wrap(j->head + chip_size - j->tail,
+		chip_size);
+	const dhara_page_t root_offset = wrap(j->head + chip_size - j->root,
+		chip_size);
+
+	if (root_offset > raw_size)
 		j->root = DHARA_PAGE_NONE;
 }
 

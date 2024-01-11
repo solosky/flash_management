@@ -17,6 +17,7 @@
 #include "spi.h"
 #include "sys_time.h"
 #include <stdio.h>
+#include "shell.h"
 
 // defines
 #define CSEL_PORT GPIOA
@@ -67,7 +68,7 @@
 
 #define ROW_ADDRESS_BLOCK_SHIFT 6
 
-#define BAD_BLOCK_MARK 0
+#define BAD_BLOCK_MARK 0xCC
 
 // private types
 typedef union {
@@ -181,6 +182,7 @@ int spi_nand_init(void)
 int spi_nand_page_read(row_address_t row, column_address_t column, uint8_t *data_out,
                        size_t read_len)
 {
+    shell_printf_line("nand: rd %d,%d,%d", row, column, read_len);
     // input validation
     if (!validate_row_address(row) || !validate_column_address(column)) {
         return SPI_NAND_RET_BAD_ADDRESS;
@@ -203,6 +205,7 @@ int spi_nand_page_read(row_address_t row, column_address_t column, uint8_t *data
 int spi_nand_page_program(row_address_t row, column_address_t column, const uint8_t *data_in,
                           size_t write_len)
 {
+    shell_printf_line("nand: wr %d,%d,%d", row, column, write_len);
     // input validation
     if (!validate_row_address(row) || !validate_column_address(column)) {
         return SPI_NAND_RET_BAD_ADDRESS;
