@@ -1,4 +1,7 @@
 # flash_management
+
+## Modified version for NAND flash MT29F2G01ABAGDWB (2G bits)
+
 Flash management stack consisting of a flash translation layer ([dhara](https://github.com/dlbeer/dhara)) and an SPI NAND driver. Uses an STM32L432KCUX MCU connected to a Micron MT29F1G01ABAFDWB SPI NAND SLC flash chip.
 
 This project is intended to be the "minimum implementation" needed to tie a FAT filesystem, flash translation layer, and low-level flash driver together. Most areas of the source code are heavily commented (probably over commented) in an effort to make it easy as possible for people unfamiliar with ONFI & flash translation concepts to follow.
