@@ -48,6 +48,8 @@ static void command_drive_stat(int argc, char *argv[]);
 static void command_mkfs(int argc, char *argv[]);
 static void command_mount(int argc, char *argv[]);
 static void command_sync(int argc, char *argv[]);
+static void command_mkdir(int argc, char *argv[]);
+static void command_rm(int argc, char *argv[]);
 static void command_nand_write_test(int argc, char *argv[]);
 static void command_map_write_test(int argc, char *argv[]);
 
@@ -81,10 +83,12 @@ static const shell_command_t shell_commands[] = {
     {"list_dir", command_list_dir, "Lists files and subdirectories within a given directory.",
      "list_dir <path>"},
     {"file_size", command_file_size, "Prints the size of the given file.", "file_size <filename>"},
-    {"drive_stat", command_drive_stat, "Prints drive stat", "drive_stat"},
+    {"free", command_drive_stat, "Prints drive stat", "drive_stat"},
     {"mkfs", command_mkfs, "Prints mkfs", "mkfs"},
     {"mount", command_mount, "Prints mount", "mount"},
     {"sync", command_sync, "Prints sync", "sync"},
+     {"rm", command_rm, "Prints rm", "rm"},
+      {"mkdir", command_mkdir, "Prints mkdir", "mkdir"},
     {"nand_write_test", command_nand_write_test,
      "Writes a value (repeated) to a page of the SPI NAND memory unit.",
      "nand_write_test <block> <page> <column> <value>"},
@@ -548,12 +552,13 @@ static void command_drive_stat(int argc, char *argv[])
     }
 
     /* Get total sectors and free sectors */
-    tot_sect = (fs->n_fatent - 2) * fs->csize;
-    fre_sect = fre_clust * fs->csize;
+    /* Get total sectors and free sectors */
+    int tot_size = (fs->n_fatent - 2) * fs->csize * 2048; // 总容量    单位Kbyte
+    int fre_size = fre_clust * fs->csize * 2048;          // 可用容量  单位Kbyte
 
     /* Print the free space (assuming 512 bytes/sector) */
-    shell_printf_line("%10lu KiB total drive space.\n%10lu KiB available.\n", tot_sect / 2,
-                      fre_sect / 2);
+    shell_printf_line("%lu KiB total drive space.\n%lu KiB available.\n", tot_size / 1024,
+                      fre_size / 1024);
 }
 
 static void command_mkfs(int argc, char *argv[])
@@ -663,7 +668,7 @@ static void command_map_write_test(int argc, char *argv[])
     sscanf(argv[1], "%hu", &page);
     sscanf(argv[2], "%hu", &value);
 
-     extern struct dhara_map map;
+    extern struct dhara_map map;
 
     // attempt to allocate a page buffer
     uint8_t *page_buffer = mem_alloc(SPI_NAND_PAGE_SIZE);
@@ -701,4 +706,45 @@ static void command_map_write_test(int argc, char *argv[])
     }
     free(page_buffer2);
     mem_free(page_buffer);
+}
+
+static void command_mkdir(int argc, char *argv[])
+{
+    extern uint8_t *work_buffer;
+    extern FATFS fs;
+
+    if (argc != 2) {
+        shell_printf_line("mkdir requires block, page, column, and value arguments. Type \"help\" "
+                          "for more info.");
+        return;
+    }
+
+    FRESULT res = f_mkdir(argv[1]);
+    if (FR_OK == res) {
+        shell_prints_line("mkdir succeeded!");
+    }
+    else {
+        shell_printf_line("mkdir failed, result: %d.", res);
+    }
+}
+
+
+static void command_rm(int argc, char *argv[])
+{
+    extern uint8_t *work_buffer;
+    extern FATFS fs;
+
+    if (argc != 2) {
+        shell_printf_line("rm requires block, page, column, and value arguments. Type \"help\" "
+                          "for more info.");
+        return;
+    }
+
+    FRESULT res = f_unlink(argv[1]);
+    if (FR_OK == res) {
+        shell_prints_line("mkdir succeeded!");
+    }
+    else {
+        shell_printf_line("mkdir failed, result: %d.", res);
+    }
 }

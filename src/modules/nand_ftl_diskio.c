@@ -87,6 +87,9 @@ DSTATUS nand_ftl_diskio_initialize(void)
     dhara_error_t err = DHARA_E_NONE;
     ret = dhara_map_resume(&map, &err);
     shell_printf_line("dhara resume return: %d, error: %d", ret, err);
+    err = DHARA_E_NONE;
+    ret = dhara_map_sync(&map, &err);
+    shell_printf_line("dhara sync return: %d, error: %d\n", ret, err);
     // map_resume will return a bad status in the case of an empty map, however this just
     // means that the file system is empty
 
@@ -113,16 +116,19 @@ DRESULT nand_ftl_diskio_read(BYTE *buff, LBA_t sector, UINT count)
         shell_printf_line("disk rd: %d", sector);
         int ret = dhara_map_read(&map, sector, buff, &err);
         uint16_t crc_old;
-        if(sector_crc_read(sector, &crc_old)){
-             uint16_t crc_calc = crc16_compute(buff, SPI_NAND_PAGE_SIZE);
-            if (crc_old != crc_calc) {
-                shell_printf_line("crc mismatch: sector=%d, prev=%d, new=%d", sector, crc_old, crc_calc);
-            }
-        }
-        //shell_printf_line("dhara read: %d, error: %d, ret: %d", sector, err, ret);
+
+        // shell_printf_line("dhara read: %d, error: %d, ret: %d", sector, err, ret);
         if (ret) {
             shell_printf_line("dhara read failed: %d, error: %d", ret, err);
             return RES_ERROR;
+        }
+
+        if (sector_crc_read(sector, &crc_old)) {
+            uint16_t crc_calc = crc16_compute(buff, SPI_NAND_PAGE_SIZE);
+            if (crc_old != crc_calc) {
+                shell_printf_line("crc mismatch: sector=%d, prev=%d, new=%d", sector, crc_old,
+                                  crc_calc);
+            }
         }
         buff += SPI_NAND_PAGE_SIZE; // sector size == page size
         sector++;
@@ -139,7 +145,7 @@ DRESULT nand_ftl_diskio_write(const BYTE *buff, LBA_t sector, UINT count)
         shell_printf_line("disk wr: %d", sector);
         int ret = dhara_map_write(&map, sector, buff, &err);
         sector_crc_write(sector, crc16_compute(buff, SPI_NAND_PAGE_SIZE));
-        //shell_printf_line("dhara write: %d, error: %d, ret: %d", sector, err, ret);
+        // shell_printf_line("dhara write: %d, error: %d, ret: %d", sector, err, ret);
         if (ret) {
             shell_printf_line("dhara write failed: %d, error: %d", ret, err);
             return RES_ERROR;

@@ -14,10 +14,10 @@
 #include "../st/ll/stm32f4xx_ll_bus.h"
 #include "../st/ll/stm32f4xx_ll_gpio.h"
 
+#include "shell.h"
 #include "spi.h"
 #include "sys_time.h"
 #include <stdio.h>
-#include "shell.h"
 
 // defines
 #define CSEL_PORT GPIOA
@@ -130,12 +130,12 @@ static int set_feature(uint8_t reg, uint8_t data, uint32_t timeout);
 static int get_feature(uint8_t reg, uint8_t *data_out, uint32_t timeout);
 static int write_enable(uint32_t timeout);
 static int page_read(row_address_t row, uint32_t timeout);
-static int read_from_cache(row_address_t row, column_address_t column, uint8_t *data_out, size_t read_len,
-                           uint32_t timeout);
-static int program_load(row_address_t row, column_address_t column, const uint8_t *data_in, size_t write_len,
-                        uint32_t timeout);
-static int program_load_random_data(row_address_t row, column_address_t column, uint8_t *data_in, size_t write_len,
-                                    uint32_t timeout);
+static int read_from_cache(row_address_t row, column_address_t column, uint8_t *data_out,
+                           size_t read_len, uint32_t timeout);
+static int program_load(row_address_t row, column_address_t column, const uint8_t *data_in,
+                        size_t write_len, uint32_t timeout);
+static int program_load_random_data(row_address_t row, column_address_t column, uint8_t *data_in,
+                                    size_t write_len, uint32_t timeout);
 static int program_execute(row_address_t row, uint32_t timeout);
 static int block_erase(row_address_t row, uint32_t timeout);
 
@@ -182,7 +182,7 @@ int spi_nand_init(void)
 int spi_nand_page_read(row_address_t row, column_address_t column, uint8_t *data_out,
                        size_t read_len)
 {
-    shell_printf_line("nand: rd %d,%d,%d", row, column, read_len);
+    //shell_printf_line("nand: rd %d,%d,%d", row, column, read_len);
     // input validation
     if (!validate_row_address(row) || !validate_column_address(column)) {
         return SPI_NAND_RET_BAD_ADDRESS;
@@ -232,32 +232,45 @@ int spi_nand_page_program(row_address_t row, column_address_t column, const uint
 
 int spi_nand_page_copy(row_address_t src, row_address_t dest)
 {
+    shell_printf_line("nand: cp %d,%d", src, dest);
     // input validation
-    if (!validate_row_address(src) || !validate_row_address(src)) {
+    if (!validate_row_address(src) || !validate_row_address(dest)) {
         return SPI_NAND_RET_BAD_ADDRESS;
     }
 
     // setup timeout tracking
     uint32_t start = sys_time_get_ms();
 
-    // read page into flash's internal cache
-    int ret = page_read(src, OP_TIMEOUT);
-    if (SPI_NAND_RET_OK != ret) return ret;
+    bool is_same_plane = (src.block & 1) == (dest.block & 1);
+    // if src and dst in same plane, we dont need copy data
+    if (is_same_plane) {
+        // read page into flash's internal cache
+        int ret = page_read(src, OP_TIMEOUT);
+        if (SPI_NAND_RET_OK != ret) return ret;
 
-    // write enable
-    uint32_t timeout = OP_TIMEOUT - sys_time_get_elapsed(start);
-    ret = write_enable(timeout);
-    if (SPI_NAND_RET_OK != ret) return ret;
+        // write enable
+        uint32_t timeout = OP_TIMEOUT - sys_time_get_elapsed(start);
+        ret = write_enable(timeout);
+        if (SPI_NAND_RET_OK != ret) return ret;
 
-    // empty program load random data
-    timeout = OP_TIMEOUT - sys_time_get_elapsed(start);
-    uint8_t dummy_byte = 0; // avoid a null pointer
-    ret = program_load_random_data(dest, 0, &dummy_byte, 0, timeout);
-    if (SPI_NAND_RET_OK != ret) return ret;
+        // empty program load random data
+        timeout = OP_TIMEOUT - sys_time_get_elapsed(start);
+        uint8_t dummy_byte = 0; // avoid a null pointer
+        ret = program_load_random_data(dest, 0, &dummy_byte, 0, timeout);
+        if (SPI_NAND_RET_OK != ret) return ret;
 
-    // write to cell array from nand's internal cache
-    timeout = OP_TIMEOUT - sys_time_get_elapsed(start);
-    return program_execute(dest, timeout);
+        // write to cell array from nand's internal cache
+        timeout = OP_TIMEOUT - sys_time_get_elapsed(start);
+        return program_execute(dest, timeout);
+    }
+    else {
+        //we need read and copy to complete the move operation
+        int ret =
+            spi_nand_page_read(src, 0, page_main_and_oob_buffer, sizeof(page_main_and_oob_buffer));
+        if (SPI_NAND_RET_OK != ret) return ret;
+        return spi_nand_page_program(dest, 0, page_main_and_oob_buffer,
+                                     sizeof(page_main_and_oob_buffer));
+    }
 }
 
 int spi_nand_block_erase(row_address_t row)
@@ -349,7 +362,7 @@ int spi_nand_clear(void)
 static void csel_setup(void)
 {
     // enable peripheral clock
-  if (!LL_AHB1_GRP1_IsEnabledClock(LL_AHB1_GRP1_PERIPH_GPIOA))
+    if (!LL_AHB1_GRP1_IsEnabledClock(LL_AHB1_GRP1_PERIPH_GPIOA))
         LL_AHB1_GRP1_EnableClock(LL_AHB1_GRP1_PERIPH_GPIOA);
 
     // setup pin as output
@@ -492,8 +505,8 @@ static int page_read(row_address_t row, uint32_t timeout)
 }
 
 /// @note Input validation is expected to be performed by caller.
-static int read_from_cache(row_address_t row, column_address_t column, uint8_t *data_out, size_t read_len,
-                           uint32_t timeout)
+static int read_from_cache(row_address_t row, column_address_t column, uint8_t *data_out,
+                           size_t read_len, uint32_t timeout)
 {
     // setup timeout tracking for second operation
     uint32_t start = sys_time_get_ms();
@@ -506,7 +519,7 @@ static int read_from_cache(row_address_t row, column_address_t column, uint8_t *
     tx_data[3] = 0;
 
     // plane select, even-numbered blocks: 0, odd-numbered blocks: 1
-    if(row.block & 1){ 
+    if (row.block & 1) {
         tx_data[1] |= 0x10;
     }
 
@@ -523,8 +536,8 @@ static int read_from_cache(row_address_t row, column_address_t column, uint8_t *
 }
 
 /// @note Input validation is expected to be performed by caller.
-static int program_load(row_address_t row, column_address_t column, const uint8_t *data_in, size_t write_len,
-                        uint32_t timeout)
+static int program_load(row_address_t row, column_address_t column, const uint8_t *data_in,
+                        size_t write_len, uint32_t timeout)
 {
     // setup timeout tracking for second operation
     uint32_t start = sys_time_get_ms();
@@ -536,7 +549,7 @@ static int program_load(row_address_t row, column_address_t column, const uint8_
     tx_data[2] = column;
 
     // plane select, even-numbered blocks: 0, odd-numbered blocks: 1
-    if(row.block & 1){ 
+    if (row.block & 1) {
         tx_data[1] |= 0x10;
     }
 
@@ -552,8 +565,8 @@ static int program_load(row_address_t row, column_address_t column, const uint8_
     return (SPI_RET_OK == ret) ? SPI_NAND_RET_OK : SPI_NAND_RET_BAD_SPI;
 }
 
-static int program_load_random_data(row_address_t row, column_address_t column, uint8_t *data_in, size_t write_len,
-                                    uint32_t timeout)
+static int program_load_random_data(row_address_t row, column_address_t column, uint8_t *data_in,
+                                    size_t write_len, uint32_t timeout)
 {
     // setup timeout tracking for second operation
     uint32_t start = sys_time_get_ms();
@@ -564,11 +577,10 @@ static int program_load_random_data(row_address_t row, column_address_t column, 
     tx_data[1] = column >> 8;
     tx_data[2] = column;
 
-// plane select, even-numbered blocks: 0, odd-numbered blocks: 1
-    if(row.block & 1){ 
+    // plane select, even-numbered blocks: 0, odd-numbered blocks: 1
+    if (row.block & 1) {
         tx_data[1] |= 0x10;
     }
-
 
     // perform transaction
     csel_select();
